@@ -88,6 +88,8 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
+        // Добавь в начало скрипта (после tg.ready()):
+        const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
         
         // ========== ИГРА ==========
         let game = {
@@ -154,8 +156,8 @@
             el.debug.textContent = 'Цены: 50/200';
         }
 
-        // ✅ UPDATE
-        function update() {
+        // Замени функцию update() на эту:
+        async function update() {
             el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
             el.dps.textContent = game.dps + '/сек';
             el.tapPower.textContent = 'Тап: x' + game.tapPower;
@@ -163,11 +165,22 @@
             el.helperLevel.textContent = game.helperLevel;
             el.tapCost.textContent = game.tapCost;
             el.helperCost.textContent = game.helperCost;
-
-            // ✅ ЦВЕТА КНОПОК
+        
             el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
             el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
-
+        
+            // 🌥️ ОБЛАКО — каждые 5 секунд
+            try {
+                await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(game)
+                });
+                el.debug.textContent = `☁️ Сохранено в облаке`;
+            } catch(e) {
+                el.debug.textContent = `Локально (${Math.floor(game.shaurma)} 🧆)`;
+            }
+            
             localStorage.setItem('shaurma_v1.3', JSON.stringify(game));
         }
 
