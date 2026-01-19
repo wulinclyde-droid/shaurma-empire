@@ -1,162 +1,228 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Шаурма Империя v1.0.0</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { margin: 0; background: linear-gradient(45deg, #ff6b35, #f7931e); color: white; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
-        #game { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-        #shaurma { font-size: 64px; cursor: pointer; transition: transform 0.1s; margin-bottom: 20px; }
-        #shaurma:active { transform: scale(0.95); }
-        #stats { font-size: 20px; margin: 10px 0; }
-        #upgrades { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px; max-height: 200px; overflow-y: auto; }
-        .upgrade { background: rgba(255,255,255,0.2); margin: 5px 0; padding: 10px; border-radius: 10px; cursor: pointer; }
-        .upgrade.locked { opacity: 0.5; cursor: not-allowed; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: linear-gradient(45deg, #ff6b35, #f7931e); 
+            color: white; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh; 
+            overflow: hidden;
+        }
+        #header { 
+            position: fixed; top: 0; left: 0; right: 0; 
+            background: rgba(0,0,0,0.9); padding: 10px; text-align: center; 
+            font-size: 14px; z-index: 100;
+        }
+        #game { 
+            display: flex; flex-direction: column; 
+            align-items: center; justify-content: center; 
+            height: 100vh; padding-top: 50px; padding-bottom: 100px;
+        }
+        #shaurma { 
+            font-size: 80px; cursor: pointer; 
+            transition: all 0.1s; user-select: none;
+            margin-bottom: 20px;
+        }
+        #shaurma:active { transform: scale(0.9); }
+        #stats { text-align: center; font-size: 24px; margin: 10px 0; }
+        #upgrades { 
+            position: fixed; bottom: 0; left: 0; right: 0; 
+            background: rgba(0,0,0,0.95); padding: 20px; 
+            max-height: 35vh; overflow-y: auto;
+        }
+        .upgrade { 
+            background: rgba(255,255,255,0.15); 
+            margin: 8px 0; padding: 15px; 
+            border-radius: 12px; cursor: pointer; 
+            font-size: 16px; transition: all 0.2s;
+        }
+        .upgrade:hover:not(.locked) { background: rgba(255,255,255,0.25); }
+        .upgrade.locked { opacity: 0.4; cursor: not-allowed; }
         .upgrade.bought { background: rgba(0,255,0,0.3); }
-        #reset { position: fixed; top: 20px; right: 20px; background: #ff4444; color: white; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; }
-        #debug { position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 10px; font-size: 12px; max-width: 200px; }
+        .version { color: #ffd700; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="reset">🔄 Начать заново</div>
-    <div id="debug">Загрузка...</div>
+    <div id="header">
+        <span class="version">v1.0.0</span> | 
+        <span id="debug">Загрузка...</span>
+    </div>
+    
     <div id="game">
-        <div id="shaurma">🧆 Шаурма</div>
+        <div id="shaurma">🧆</div>
         <div id="stats">
-            <div id="count">Шаурм: 0</div>
-            <div id="dps">Доход/сек: 0</div>
+            <div id="count">0 🧆</div>
+            <div id="dps">0/сек</div>
         </div>
     </div>
-    <div id="upgrades"></div>
+    
+    <div id="upgrades">
+        <h3 style="margin-bottom: 15px;">🏪 Апгрейды</h3>
+    </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
-
-        const debugEl = document.getElementById('debug');
-        const shaurmaEl = document.getElementById('shaurma');
-        const countEl = document.getElementById('count');
-        const dpsEl = document.getElementById('dps');
-        const upgradesEl = document.getElementById('upgrades');
-
-        // 🆕 ПРЯМАЯ ОЧИСТКА ВСЕГО
-        document.getElementById('reset').onclick = () => {
-            localStorage.clear(); // ✅ ОЧИЩАЕМ ВСЁ
-            game = getDefaultGame();
-            updateDisplay();
-            renderUpgrades();
-            debugEl.textContent = '✅ Сброшено!';
-            tg.HapticFeedback.notificationOccurred('error');
+        
+        // ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+        let gameData = {
+            version: '1.0.0',
+            shaurma: 0,
+            dps: 0,
+            tapPower: 1,
+            upgrades: {
+                tap: { level: 0, baseCost: 50 },
+                helper: { level: 0, baseCost: 200 }
+            },
+            lastSave: Date.now()
         };
 
-        function getDefaultGame() {
-            return {
+        const elements = {
+            shaurma: document.getElementById('shaurma'),
+            count: document.getElementById('count'),
+            dps: document.getElementById('dps'),
+            upgrades: document.getElementById('upgrades'),
+            debug: document.getElementById('debug')
+        };
+
+        // 🔄 Загрузка с проверкой версии
+        function loadGame() {
+            try {
+                const saved = localStorage.getItem('shaurmaGame_v1');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.version === '1.0.0') {
+                        gameData = parsed;
+                        elements.debug.textContent = 'Загружено v1.0.0';
+                        return true;
+                    }
+                }
+                // Новая игра
+                resetGame();
+                elements.debug.textContent = 'Новая игра v1.0.0';
+                return false;
+            } catch(e) {
+                resetGame();
+                elements.debug.textContent = 'Сброс (ошибка)';
+            }
+        }
+
+        // 🔄 Сброс
+        function resetGame() {
+            localStorage.removeItem('shaurmaGame_v1');
+            gameData = {
+                version: '1.0.0',
                 shaurma: 0,
                 dps: 0,
                 tapPower: 1,
                 upgrades: {
-                    tap: { level: 0, cost: 50 },
-                    helper: { level: 0, cost: 200 }
-                }
+                    tap: { level: 0, baseCost: 50 },
+                    helper: { level: 0, baseCost: 200 }
+                },
+                lastSave: Date.now()
             };
         }
 
-        // 🆕 СУПЕРБЕЗОПАСНАЯ загрузка
-        function loadGame() {
-            try {
-                const saved = localStorage.getItem('shaurmaGame');
-                debugEl.textContent = saved ? 'Загружено из сохранения' : 'Новое сохранение';
-                
-                if(!saved) return getDefaultGame();
-                
-                const parsed = JSON.parse(saved);
-                
-                // ✅ ФИКС NaN И ОТРИЦАТЕЛЬНЫХ ЗНАЧЕНИЙ
-                return {
-                    shaurma: Math.max(0, Number(parsed.shaurma) || 0),
-                    dps: Math.max(0, Number(parsed.dps) || 0),
-                    tapPower: Math.max(1, Number(parsed.tapPower) || 1),
-                    upgrades: {
-                        tap: {
-                            level: Math.max(0, Number(parsed.upgrades?.tap?.level) || 0),
-                            cost: Math.max(50, Number(parsed.upgrades?.tap?.cost) || 50)
-                        },
-                        helper: {
-                            level: Math.max(0, Number(parsed.upgrades?.helper?.level) || 0),
-                            cost: Math.max(200, Number(parsed.upgrades?.helper?.cost) || 200)
-                        }
-                    }
-                };
-            } catch(e) {
-                debugEl.textContent = 'Ошибка сохранения — новый старт';
-                return getDefaultGame();
-            }
+        // 💾 Сохранение
+        function saveGame() {
+            localStorage.setItem('shaurmaGame_v1', JSON.stringify(gameData));
+            gameData.lastSave = Date.now();
         }
 
-        let game = loadGame();
-
+        // 📊 Обновление экрана
         function updateDisplay() {
-            const shaurmaCount = Math.floor(game.shaurma);
-            countEl.textContent = `Шаурм: ${shaurmaCount.toLocaleString()}`;
-            dpsEl.textContent = `Доход/сек: ${Math.floor(game.dps).toLocaleString()}`;
-            
-            // ✅ СОХРАНЕНИЕ КАЖДЫЙ РАЗ
-            localStorage.setItem('shaurmaGame', JSON.stringify(game));
-            debugEl.textContent = `Шаурма: ${shaurmaCount} | Сохранено`;
+            elements.count.textContent = Math.floor(gameData.shaurma).toLocaleString() + ' 🧆';
+            elements.dps.textContent = Math.floor(gameData.dps).toLocaleString() + '/сек';
+            saveGame();
         }
 
-        // Тап
-        shaurmaEl.onclick = () => {
-            game.shaurma += game.tapPower;
+        // 🖱️ Тап
+        elements.shaurma.onclick = () => {
+            gameData.shaurma += gameData.tapPower;
             updateDisplay();
             tg.HapticFeedback.impactOccurred('light');
-            shaurmaEl.style.transform = 'scale(0.95)';
-            setTimeout(() => shaurmaEl.style.transform = '', 100);
+            
+            // Анимация
+            const shaurma = elements.shaurma;
+            shaurma.style.transform = 'scale(0.9)';
+            setTimeout(() => shaurma.style.transform = 'scale(1)', 100);
         };
 
-        // Пассивный доход
+        // 💰 Пассивный доход
         setInterval(() => {
-            game.shaurma += game.dps;
+            gameData.shaurma += gameData.dps;
             updateDisplay();
         }, 1000);
 
-        // Апгрейды — ✅ ФИКС ПОКУПКИ ПО ДОБИВАНИЮ
+        // 🏪 Апгрейды
         function renderUpgrades() {
-            upgradesEl.innerHTML = '<h3 style="margin: 0 0 10px 0;">🏪 Апгрейды</h3>';
-            
             const upgradesList = [
-                { 
-                    key: 'tap', 
-                    name: '👐 Быстрые руки', 
-                    desc: `+1 за тап (ур. ${game.upgrades.tap.level})`,
-                    effect: () => {
-                        game.upgrades.tap.level++;
-                        game.tapPower += 1;
+                {
+                    id: 'tap',
+                    emoji: '👐',
+                    name: 'Быстрые руки',
+                    desc: `Ур. ${gameData.upgrades.tap.level} (+${gameData.tapPower} за тап)`,
+                    getCost: () => Math.floor(gameData.upgrades.tap.baseCost * Math.pow(1.15, gameData.upgrades.tap.level)),
+                    buy: () => {
+                        gameData.upgrades.tap.level++;
+                        gameData.tapPower++;
                     }
                 },
-                { 
-                    key: 'helper', 
-                    name: '🤖 Помощник', 
-                    desc: `+1/сек (ур. ${game.upgrades.helper.level})`,
-                    effect: () => {
-                        game.upgrades.helper.level++;
-                        game.dps += 1;
+                {
+                    id: 'helper',
+                    emoji: '🤖',
+                    name: 'Помощник',
+                    desc: `Ур. ${gameData.upgrades.helper.level} (+${gameData.dps} /сек)`,
+                    getCost: () => Math.floor(gameData.upgrades.helper.baseCost * Math.pow(1.2, gameData.upgrades.helper.level)),
+                    buy: () => {
+                        gameData.upgrades.helper.level++;
+                        gameData.dps++;
                     }
                 }
             ];
 
+            elements.upgrades.innerHTML = '<h3 style="margin-bottom: 15px;">🏪 Апгрейды</h3>';
+            
             upgradesList.forEach(upgrade => {
-                const data = game.upgrades[upgrade.key];
-                const canBuy = game.shaurma >= data.cost; // ✅ ТОЧНАЯ ПРОВЕРКА
+                const cost = upgrade.getCost();
+                const canBuy = gameData.shaurma >= cost;
                 
-                const el = document.createElement('div');
-                el.className = `upgrade ${!canBuy ? 'locked' : ''} ${data.level > 0 ? 'bought' : ''}`;
-                el.innerHTML = `
-                    ${upgrade.name}<br>
-                    <small>${upgrade.desc} | ${Math.floor(data.cost).toLocaleString()} 🧆</small>
+                const div = document.createElement('div');
+                div.className = `upgrade ${canBuy ? '' : 'locked'} ${upgrade.id === 'tap' && gameData.upgrades.tap.level > 0 ? 'bought' : ''}`;
+                div.innerHTML = `
+                    <div style="font-size: 18px; margin-bottom: 5px;">${upgrade.emoji} ${upgrade.name}</div>
+                    <div style="font-size: 14px; opacity: 0.8;">${upgrade.desc}</div>
+                    <div style="font-size: 16px; margin-top: 8px;">${cost.toLocaleString()} 🧆</div>
                 `;
                 
-                el.onclick = () => {
+                div.onclick = () => {
                     if (canBuy) {
-                        game.shaurma -= data.cost; // ✅ ТРАТИМ ТОЧНО
-                        upgrade.effect(); // ✅ ПРИМЕНЯЕМ ЭФ
+                        gameData.shaurma -= cost;
+                        upgrade.buy();
+                        updateDisplay();
+                        renderUpgrades();
+                        tg.HapticFeedback.notificationOccurred('success');
+                    }
+                };
+                
+                elements.upgrades.appendChild(div);
+            });
+        }
+
+        // 🚀 ЗАПУСК
+        loadGame();
+        updateDisplay();
+        renderUpgrades();
+        
+        // DEBUG: клик по заголовку = сброс
+        document.getElementById('header').onclick = resetGame;
+        
+        console.log('✅ Шаурма Империя v1.0.0 запущена!');
+    </script>
+</body>
+</html>
