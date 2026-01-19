@@ -106,7 +106,7 @@
         const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
         
         let game = {
-            version: '1.4.1',
+            version: '1.4.2',
             shaurma: 0,
             dps: 0,
             tapPower: 1,
@@ -115,7 +115,7 @@
             tapCost: 50,
             helperCost: 200
         };
-
+        
         const el = {
             shaurma: document.getElementById('shaurma'),
             count: document.getElementById('count'),
@@ -133,13 +133,14 @@
             tasksBtn: document.getElementById('tasks-btn'),
             tasks: document.getElementById('tasks')
         };
-
+        
+        // Загрузка
         function load() {
             const saved = localStorage.getItem('shaurma_v1.4');
             if (saved) {
                 try {
                     const data = JSON.parse(saved);
-                    if (data.version === '1.4.1') {
+                    if (data.version === '1.4.2') {
                         game = data;
                         el.status.textContent = 'Загружено';
                         return;
@@ -148,11 +149,12 @@
             }
             el.status.textContent = 'Новое сохранение';
         }
-
+        
+        // Сброс
         function reset() {
             localStorage.removeItem('shaurma_v1.4');
             game = {
-                version: '1.4.1',
+                version: '1.4.2',
                 shaurma: 0,
                 dps: 0,
                 tapPower: 1,
@@ -164,7 +166,8 @@
             update();
             el.status.textContent = 'Сброшено';
         }
-
+        
+        // ✅ ОБНОВЛЕНИЕ
         async function update() {
             el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
             el.dps.textContent = game.dps + '/сек';
@@ -173,24 +176,26 @@
             el.helperLevel.textContent = game.helperLevel;
             el.tapCost.textContent = game.tapCost;
             el.helperCost.textContent = game.helperCost;
-
+        
             el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
             el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
-
+        
+            // Облако
             try {
                 await fetch('/api/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(game)
                 });
-                el.debug.textContent = '☁️ Облако';
+                el.debug.textContent = '☁️ v1.4.2';
             } catch(e) {
                 el.debug.textContent = 'Локально';
             }
             
             localStorage.setItem('shaurma_v1.4', JSON.stringify(game));
         }
-
+        
+        // Тап
         el.shaurma.onclick = () => {
             game.shaurma += game.tapPower;
             update();
@@ -198,12 +203,14 @@
             el.shaurma.style.transform = 'scale(0.9)';
             setTimeout(() => el.shaurma.style.transform = '', 100);
         };
-
+        
+        // Пассивка
         setInterval(() => {
             game.shaurma += game.dps;
             update();
         }, 1000);
-
+        
+        // Апгрейды
         el.tapUpgrade.onclick = () => {
             if (game.shaurma >= game.tapCost) {
                 game.shaurma -= game.tapCost;
@@ -214,7 +221,7 @@
                 tg.HapticFeedback.notificationOccurred('success');
             }
         };
-
+        
         el.helperUpgrade.onclick = () => {
             if (game.shaurma >= game.helperCost) {
                 game.shaurma -= game.helperCost;
@@ -225,12 +232,46 @@
                 tg.HapticFeedback.notificationOccurred('success');
             }
         };
-
+        
+        // ✅ ЗАДАНИЯ
+        const tasks = [
+            { id: 1, name: '50 тапов', progress: () => Math.floor(game.shaurma), goal: 50, reward: 100 },
+            { id: 2, name: '1 апгрейд', progress: () => game.tapLevel + game.helperLevel, goal: 1, reward: 250 },
+            { id: 3, name: '200 шаурмы', progress: () => Math.floor(game.shaurma), goal: 200, reward: 500 }
+        ];
+        
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                const progress = task.progress();
+                const done = progress >= task.goal;
+                const div = document.createElement('div');
+                div.style.margin = '8px 0';
+                div.style.padding = '10px';
+                div.style.background = done ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)';
+                div.style.borderRadius = '8px';
+                div.innerHTML = `
+                    <div style="font-weight: bold;">${done ? '✅' : '🔄'} ${task.name}</div>
+                    <div style="font-size: 12px; opacity: 0.8;">
+                        ${progress}/${task.goal} → <span style="color: #ffd700;">${task.reward.toLocaleString()}</span> 🧆
+                    </div>
+                `;
+                taskList.appendChild(div);
+            });
+        }
+        
+        // Кнопки
         el.reset.onclick = reset;
-        el.tasksBtn.onclick = () => el.tasks.style.display = el.tasks.style.display === 'block' ? 'none' : 'block';
-
+        el.tasksBtn.onclick = () => {
+            el.tasks.style.display = el.tasks.style.display === 'block' ? 'none' : 'block';
+            if (el.tasks.style.display === 'block') renderTasks();
+        };
+        
+        // Запуск
         load();
         update();
     </script>
+
 </body>
 </html>
