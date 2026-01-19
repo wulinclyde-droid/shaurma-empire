@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Шаурма Империя v1.3.0</title>
+    <title>Шаурма Империя v1.4.1</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -14,23 +14,33 @@
         }
         #header { 
             position: fixed; top: 0; left: 0; right: 0; 
-            background: rgba(0,0,0,0.9); padding: 10px; text-align: center; 
-            font-size: 14px; z-index: 100;
+            background: rgba(0,0,0,0.9); padding: 5px; text-align: center; 
+            font-size: 12px; z-index: 100; height: 30px;
         }
         #reset-btn { 
-            position: fixed; top: 10px; right: 10px; 
+            position: fixed; top: 35px; right: 10px; 
             background: #ff4444; color: white; padding: 8px 12px; 
-            border-radius: 20px; cursor: pointer; font-size: 12px;
+            border-radius: 20px; cursor: pointer; font-size: 12px; z-index: 101;
+        }
+        #tasks-btn {
+            position: fixed; top: 35px; left: 10px; 
+            background: #4CAF50; color: white; border: none; padding: 8px 12px; 
+            border-radius: 20px; cursor: pointer; font-size: 12px; z-index: 101;
         }
         #debug { 
-            position: fixed; top: 50px; left: 10px; 
-            background: rgba(0,0,0,0.8); padding: 5px 10px; 
-            border-radius: 10px; font-size: 12px; max-width: 300px;
+            position: fixed; top: 70px; left: 10px; 
+            background: rgba(0,0,0,0.8); padding: 5px 8px; 
+            border-radius: 10px; font-size: 11px; max-width: 200px; z-index: 101;
+        }
+        #tasks {
+            position: fixed; top: 110px; right: 10px; 
+            background: rgba(0,0,0,0.95); padding: 15px; border-radius: 15px; 
+            max-width: 250px; display: none; z-index: 102; font-size: 14px;
         }
         #game { 
             display: flex; flex-direction: column; 
             align-items: center; justify-content: center; 
-            height: 100vh; padding-top: 80px; padding-bottom: 120px;
+            height: 100vh; padding-top: 120px; padding-bottom: 120px;
         }
         #shaurma { 
             font-size: 80px; cursor: pointer; 
@@ -63,11 +73,16 @@
 </head>
 <body>
     <div id="header">
-        <span class="version">v1.3.0</span> | 
+        <span class="version">v1.4.1</span> | 
         <span id="status">Загрузка...</span>
     </div>
-    <div id="reset-btn">🔄 СБРОСИТЬ</div>
-    <div id="debug"></div>
+    <button id="tasks-btn">📋 Задания</button>
+    <button id="reset-btn">🔄 Сброс</button>
+    <div id="debug">Готово</div>
+    <div id="tasks">
+        <h4>📋 Задания дня</h4>
+        <div id="task-list"></div>
+    </div>
     
     <div id="game">
         <div id="shaurma">🧆</div>
@@ -78,7 +93,6 @@
         </div>
     </div>
     
-    <!-- ✅ СТАТИЧНЫЕ КНОПКИ — НИКОГДА НЕ ЛОМАЮТСЯ -->
     <div id="upgrades">
         <h3>🏪 Апгрейды</h3>
         <div id="tap-upgrade" class="upgrade">👐 Быстрые руки<br>Ур. <span id="tap-level">0</span><br><span id="tap-cost">50</span> 🧆</div>
@@ -88,11 +102,11 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
+        
         const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
         
-        // ========== ИГРА ==========
         let game = {
-            version: '1.3.0',
+            version: '1.4.1',
             shaurma: 0,
             dps: 0,
             tapPower: 1,
@@ -102,7 +116,6 @@
             helperCost: 200
         };
 
-        // ЭЛЕМЕНТЫ
         const el = {
             shaurma: document.getElementById('shaurma'),
             count: document.getElementById('count'),
@@ -116,32 +129,30 @@
             helperUpgrade: document.getElementById('helper-upgrade'),
             status: document.getElementById('status'),
             debug: document.getElementById('debug'),
-            reset: document.getElementById('reset-btn')
+            reset: document.getElementById('reset-btn'),
+            tasksBtn: document.getElementById('tasks-btn'),
+            tasks: document.getElementById('tasks')
         };
 
-        // ✅ ЛОАД
         function load() {
-            const saved = localStorage.getItem('shaurma_v1.3');
+            const saved = localStorage.getItem('shaurma_v1.4');
             if (saved) {
                 try {
                     const data = JSON.parse(saved);
-                    if (data.version === '1.3.0') {
+                    if (data.version === '1.4.1') {
                         game = data;
                         el.status.textContent = 'Загружено';
-                        el.debug.textContent = `Данные: ${Math.floor(game.shaurma)} 🧆`;
                         return;
                     }
                 } catch(e) {}
             }
-            reset();
-            el.status.textContent = 'Новая игра';
+            el.status.textContent = 'Новое сохранение';
         }
 
-        // ✅ СБРОС
         function reset() {
-            localStorage.removeItem('shaurma_v1.3');
+            localStorage.removeItem('shaurma_v1.4');
             game = {
-                version: '1.3.0',
+                version: '1.4.1',
                 shaurma: 0,
                 dps: 0,
                 tapPower: 1,
@@ -152,10 +163,8 @@
             };
             update();
             el.status.textContent = 'Сброшено';
-            el.debug.textContent = 'Цены: 50/200';
         }
 
-        // ✅ НОВАЯ ФУНКЦИЯ update() — заменить полностью
         async function update() {
             el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
             el.dps.textContent = game.dps + '/сек';
@@ -164,30 +173,24 @@
             el.helperLevel.textContent = game.helperLevel;
             el.tapCost.textContent = game.tapCost;
             el.helperCost.textContent = game.helperCost;
-        
-            // Цвета кнопок
+
             el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
             el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
-        
-            // 🌥️ ОБЛАКО — синхронизация
+
             try {
-                const saveResponse = await fetch('/api/save', {
+                await fetch('/api/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(game)
                 });
-                if (saveResponse.ok) {
-                    el.debug.textContent = '☁️ Облако OK';
-                }
+                el.debug.textContent = '☁️ Облако';
             } catch(e) {
                 el.debug.textContent = 'Локально';
             }
             
-            // Локальное сохранение (backup)
             localStorage.setItem('shaurma_v1.4', JSON.stringify(game));
         }
 
-        // ✅ ТАП
         el.shaurma.onclick = () => {
             game.shaurma += game.tapPower;
             update();
@@ -196,13 +199,11 @@
             setTimeout(() => el.shaurma.style.transform = '', 100);
         };
 
-        // ✅ ПАССИВКА
         setInterval(() => {
             game.shaurma += game.dps;
             update();
         }, 1000);
 
-        // ✅ АПГРЕЙДЫ — СТАТИЧНЫЕ КНОПКИ
         el.tapUpgrade.onclick = () => {
             if (game.shaurma >= game.tapCost) {
                 game.shaurma -= game.tapCost;
@@ -211,7 +212,6 @@
                 game.tapCost = Math.floor(game.tapCost * 1.15);
                 update();
                 tg.HapticFeedback.notificationOccurred('success');
-                el.debug.textContent = 'Куплен тап-апгрейд!';
             }
         };
 
@@ -223,50 +223,14 @@
                 game.helperCost = Math.floor(game.helperCost * 1.2);
                 update();
                 tg.HapticFeedback.notificationOccurred('success');
-                el.debug.textContent = 'Куплен помощник!';
             }
         };
-        // Кнопка заданий
-        document.getElementById('tasks-btn').onclick = () => {
-            document.getElementById('tasks').style.display = 'block';
-            renderTasks();
-        };
-        
-        // Простые задания
-        const tasks = [
-            { id: 1, name: '50 тапов', progress: () => Math.floor(game.shaurma), goal: 50, reward: 100 },
-            { id: 2, name: '1 апгрейд', progress: () => game.tapLevel + game.helperLevel, goal: 1, reward: 250 }
-        ];
-        
-        function renderTasks() {
-            const taskList = document.getElementById('task-list');
-            taskList.innerHTML = '';
-            tasks.forEach(task => {
-                const progress = task.progress();
-                const done = progress >= task.goal;
-                const div = document.createElement('div');
-                div.innerHTML = `
-                    ${done ? '✅' : '🔄'} ${task.name}<br>
-                    <small>${progress}/${task.goal} → ${task.reward} 🧆</small>
-                `;
-                if (done) div.style.color = '#4CAF50';
-                taskList.appendChild(div);
-            });
-        }
-        // ✅ РЕСЕТ
-        el.reset.onclick = reset;
 
-        // ✅ СТАРТ
+        el.reset.onclick = reset;
+        el.tasksBtn.onclick = () => el.tasks.style.display = el.tasks.style.display === 'block' ? 'none' : 'block';
+
         load();
         update();
-        
-        console.log('✅ v1.3.0 — СТАТИЧНЫЕ КНОПКИ');
     </script>
-    <!-- ДОБАВЬ ПЕРЕД </body> -->
-    <div id="tasks" style="position: fixed; top: 60px; right: 10px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; display: none;">
-        <h4>📋 Задания</h4>
-        <div id="task-list"></div>
-    </div>
-    <button id="tasks-btn" style="position: fixed; top: 10px; left: 10px; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer;">📋</button>
 </body>
 </html>
