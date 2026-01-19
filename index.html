@@ -88,7 +88,6 @@
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
-        // Добавь в начало скрипта (после tg.ready()):
         const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
         
         // ========== ИГРА ==========
@@ -156,7 +155,7 @@
             el.debug.textContent = 'Цены: 50/200';
         }
 
-        // Замени функцию update() на эту:
+        // ✅ НОВАЯ ФУНКЦИЯ update() — заменить полностью
         async function update() {
             el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
             el.dps.textContent = game.dps + '/сек';
@@ -166,22 +165,26 @@
             el.tapCost.textContent = game.tapCost;
             el.helperCost.textContent = game.helperCost;
         
+            // Цвета кнопок
             el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
             el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
         
-            // 🌥️ ОБЛАКО — каждые 5 секунд
+            // 🌥️ ОБЛАКО — синхронизация
             try {
-                await fetch('/api/save', {
+                const saveResponse = await fetch('/api/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(game)
                 });
-                el.debug.textContent = `☁️ Сохранено в облаке`;
+                if (saveResponse.ok) {
+                    el.debug.textContent = '☁️ Облако OK';
+                }
             } catch(e) {
-                el.debug.textContent = `Локально (${Math.floor(game.shaurma)} 🧆)`;
+                el.debug.textContent = 'Локально';
             }
             
-            localStorage.setItem('shaurma_v1.3', JSON.stringify(game));
+            // Локальное сохранение (backup)
+            localStorage.setItem('shaurma_v1.4', JSON.stringify(game));
         }
 
         // ✅ ТАП
@@ -223,7 +226,33 @@
                 el.debug.textContent = 'Куплен помощник!';
             }
         };
-
+        // Кнопка заданий
+        document.getElementById('tasks-btn').onclick = () => {
+            document.getElementById('tasks').style.display = 'block';
+            renderTasks();
+        };
+        
+        // Простые задания
+        const tasks = [
+            { id: 1, name: '50 тапов', progress: () => Math.floor(game.shaurma), goal: 50, reward: 100 },
+            { id: 2, name: '1 апгрейд', progress: () => game.tapLevel + game.helperLevel, goal: 1, reward: 250 }
+        ];
+        
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+            tasks.forEach(task => {
+                const progress = task.progress();
+                const done = progress >= task.goal;
+                const div = document.createElement('div');
+                div.innerHTML = `
+                    ${done ? '✅' : '🔄'} ${task.name}<br>
+                    <small>${progress}/${task.goal} → ${task.reward} 🧆</small>
+                `;
+                if (done) div.style.color = '#4CAF50';
+                taskList.appendChild(div);
+            });
+        }
         // ✅ РЕСЕТ
         el.reset.onclick = reset;
 
@@ -233,5 +262,11 @@
         
         console.log('✅ v1.3.0 — СТАТИЧНЫЕ КНОПКИ');
     </script>
+    <!-- ДОБАВЬ ПЕРЕД </body> -->
+    <div id="tasks" style="position: fixed; top: 60px; right: 10px; background: rgba(0,0,0,0.9); padding: 15px; border-radius: 15px; display: none;">
+        <h4>📋 Задания</h4>
+        <div id="task-list"></div>
+    </div>
+    <button id="tasks-btn" style="position: fixed; top: 10px; left: 10px; background: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 20px; cursor: pointer;">📋</button>
 </body>
 </html>
