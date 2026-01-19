@@ -12,6 +12,7 @@
         #upgrades { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px; max-height: 200px; overflow-y: auto; }
         .upgrade { background: rgba(255,255,255,0.2); margin: 5px 0; padding: 10px; border-radius: 10px; cursor: pointer; }
         .upgrade.locked { opacity: 0.5; cursor: not-allowed; }
+        .upgrade.bought { background: rgba(0,255,0,0.3); }
     </style>
 </head>
 <body>
@@ -26,12 +27,26 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.ready(); tg.expand(); tg.MainButton.setText('Сохранить').show();
+        tg.ready(); tg.expand();
 
+        // ИГРАЕМ БЕЗ КНОПКИ — АВТОСОХРАНЕНИЕ КАЖДЫЕ 2 СЕКУНДЫ
+        let saveTimeout;
+        function saveGame() {
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => {
+                localStorage.setItem('shaurmaGame', JSON.stringify(game));
+            }, 2000);
+        }
+
+        // Загрузка с дефолтами
         let game = JSON.parse(localStorage.getItem('shaurmaGame')) || {
             shaurma: 0,
             dps: 0,
-            upgrades: { tap: 0, helper: 0 }
+            tapPower: 1,
+            upgrades: {
+                tap: { level: 0, cost: 50 },
+                helper: { level: 0, cost: 200 }
+            }
         };
 
         const shaurma = document.getElementById('shaurma');
@@ -40,16 +55,18 @@
         const upgradesEl = document.getElementById('upgrades');
 
         function updateDisplay() {
-            countEl.textContent = `Шаурм: ${Math.floor(game.shaurma)}`;
-            dpsEl.textContent = `Доход/сек: ${game.dps}`;
-            localStorage.setItem('shaurmaGame', JSON.stringify(game));
+            countEl.textContent = `Шаурм: ${Math.floor(game.shaurma).toLocaleString()}`;
+            dpsEl.textContent = `Доход/сек: ${game.dps.toLocaleString()}`;
+            saveGame(); // АВТОСОХРАНЕНИЕ
         }
 
         // Тап
         shaurma.onclick = () => {
-            game.shaurma += 1 + game.upgrades.tap;
+            game.shaurma += game.tapPower;
             updateDisplay();
             tg.HapticFeedback.impactOccurred('light');
+            shaurma.style.transform = 'scale(0.95)';
+            setTimeout(() => shaurma.style.transform = '', 100);
         };
 
         // Пассивный доход
@@ -58,35 +75,62 @@
             updateDisplay();
         }, 1000);
 
-        // Апгрейды
-        const upgrades = [
-            { id: 'tap', name: '👐 Быстрые руки', cost: 50, effect: () => game.upgrades.tap++, dpsCost: 0 },
-            { id: 'helper', name: '🤖 Помощник', cost: 200, effect: () => { game.upgrades.helper++; game.dps += 1; }, dpsCost: 1 }
-        ];
-
+        // Апгрейды — ВСЕ ДАННЫЕ В game.upgrades
         function renderUpgrades() {
             upgradesEl.innerHTML = '<h3 style="margin: 0 0 10px 0;">🏪 Апгрейды</h3>';
+            
+            const upgrades = [
+                { 
+                    key: 'tap', 
+                    name: '👐 Быстрые руки', 
+                    desc: `+1 за тап (ур.${game.upgrades.tap.level})`,
+                    effect: () => {
+                        game.upgrades.tap.level++;
+                        game.tapPower++;
+                    }
+                },
+                { 
+                    key: 'helper', 
+                    name: '🤖 Помощник', 
+                    desc: `+1/сек (ур.${game.upgrades.helper.level})`,
+                    effect: () => {
+                        game.upgrades.helper.level++;
+                        game.dps += 1;
+                    }
+                }
+            ];
+
             upgrades.forEach(upgrade => {
-                const canBuy = game.shaurma >= upgrade.cost;
+                const upgradeData = game.upgrades[upgrade.key];
+                const canBuy = game.shaurma >= upgradeData.cost;
+                
                 const el = document.createElement('div');
-                el.className = `upgrade ${!canBuy ? 'locked' : ''}`;
-                el.innerHTML = `${upgrade.name}<br><small>${upgrade.cost} 🧆</small>`;
+                el.className = `upgrade ${!canBuy ? 'locked' : ''} ${upgradeData.level > 0 ? 'bought' : ''}`;
+                el.innerHTML = `
+                    ${upgrade.name}<br>
+                    <small>${upgrade.desc} | ${upgradeData.cost.toLocaleString()} 🧆</small>
+                `;
                 el.onclick = () => {
                     if (canBuy) {
-                        game.shaurma -= upgrade.cost;
+                        game.shaurma -= upgradeData.cost;
                         upgrade.effect();
-                        upgrade.cost = Math.floor(upgrade.cost * 1.5);
+                        // Цена растёт
+                        upgradeData.cost = Math.floor(upgradeData.cost * 1.5);
                         updateDisplay();
                         renderUpgrades();
+                        tg.HapticFeedback.notificationOccurred('success');
                     }
                 };
                 upgradesEl.appendChild(el);
             });
         }
 
-        tg.MainButton.onclick = updateDisplay;
+        // СТАРТ
         updateDisplay();
         renderUpgrades();
+        
+        // DEBUG: Показываем статус сохранения
+        console.log('Game loaded:', game);
     </script>
 </body>
 </html>
