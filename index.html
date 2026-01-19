@@ -13,9 +13,11 @@
         .upgrade { background: rgba(255,255,255,0.2); margin: 5px 0; padding: 10px; border-radius: 10px; cursor: pointer; }
         .upgrade.locked { opacity: 0.5; cursor: not-allowed; }
         .upgrade.bought { background: rgba(0,255,0,0.3); }
+        #reset { position: fixed; top: 20px; right: 20px; background: #ff4444; color: white; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-size: 12px; }
     </style>
 </head>
 <body>
+    <div id="reset">🔄 Начать заново</div>
     <div id="game">
         <div id="shaurma">🧆 Шаурма</div>
         <div id="stats">
@@ -29,53 +31,84 @@
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
 
-        // ИГРАЕМ БЕЗ КНОПКИ — АВТОСОХРАНЕНИЕ КАЖДЫЕ 2 СЕКУНДЫ
-        let saveTimeout;
-        function saveGame() {
-            clearTimeout(saveTimeout);
-            saveTimeout = setTimeout(() => {
-                localStorage.setItem('shaurmaGame', JSON.stringify(game));
-            }, 2000);
-        }
-
-        // Загрузка с дефолтами
-        let game = JSON.parse(localStorage.getItem('shaurmaGame')) || {
-            shaurma: 0,
-            dps: 0,
-            tapPower: 1,
-            upgrades: {
-                tap: { level: 0, cost: 50 },
-                helper: { level: 0, cost: 200 }
+        // 🆕 РЕСЕТ КНОПКА
+        document.getElementById('reset').onclick = () => {
+            if(confirm('🔄 Сбросить весь прогресс?')) {
+                localStorage.removeItem('shaurmaGame');
+                location.reload();
             }
         };
 
-        const shaurma = document.getElementById('shaurma');
+        // 🆕 БЕЗОПАСНАЯ загрузка
+        function loadGame() {
+            try {
+                const saved = localStorage.getItem('shaurmaGame');
+                if(!saved) return getDefaultGame();
+                
+                const game = JSON.parse(saved);
+                
+                // ✅ ПРОВЕРЯЕМ ВСЕ ПОЛЯ
+                return {
+                    shaurma: isFinite(game.shaurma) ? Math.max(0, game.shaurma) : 0,
+                    dps: isFinite(game.dps) ? Math.max(0, game.dps) : 0,
+                    tapPower: isFinite(game.tapPower) ? Math.max(1, game.tapPower) : 1,
+                    upgrades: {
+                        tap: {
+                            level: isFinite(game.upgrades?.tap?.level) ? Math.max(0, game.upgrades.tap.level) : 0,
+                            cost: isFinite(game.upgrades?.tap?.cost) ? Math.max(50, game.upgrades.tap.cost) : 50
+                        },
+                        helper: {
+                            level: isFinite(game.upgrades?.helper?.level) ? Math.max(0, game.upgrades.helper.level) : 0,
+                            cost: isFinite(game.upgrades?.helper?.cost) ? Math.max(200, game.upgrades.helper.cost) : 200
+                        }
+                    }
+                };
+            } catch(e) {
+                return getDefaultGame();
+            }
+        }
+
+        function getDefaultGame() {
+            return {
+                shaurma: 0,
+                dps: 0,
+                tapPower: 1,
+                upgrades: {
+                    tap: { level: 0, cost: 50 },
+                    helper: { level: 0, cost: 200 }
+                }
+            };
+        }
+
+        let game = loadGame();
+
+        const shaurmaEl = document.getElementById('shaurma');
         const countEl = document.getElementById('count');
         const dpsEl = document.getElementById('dps');
         const upgradesEl = document.getElementById('upgrades');
 
         function updateDisplay() {
             countEl.textContent = `Шаурм: ${Math.floor(game.shaurma).toLocaleString()}`;
-            dpsEl.textContent = `Доход/сек: ${game.dps.toLocaleString()}`;
-            saveGame(); // АВТОСОХРАНЕНИЕ
+            dpsEl.textContent = `Доход/сек: ${Math.floor(game.dps).toLocaleString()}`;
+            localStorage.setItem('shaurmaGame', JSON.stringify(game));
         }
 
         // Тап
-        shaurma.onclick = () => {
+        shaurmaEl.onclick = () => {
             game.shaurma += game.tapPower;
             updateDisplay();
             tg.HapticFeedback.impactOccurred('light');
-            shaurma.style.transform = 'scale(0.95)';
-            setTimeout(() => shaurma.style.transform = '', 100);
+            shaurmaEl.style.transform = 'scale(0.95)';
+            setTimeout(() => shaurmaEl.style.transform = '', 100);
         };
 
-        // Пассивный доход
+        // Пассивка
         setInterval(() => {
             game.shaurma += game.dps;
             updateDisplay();
         }, 1000);
 
-        // Апгрейды — ВСЕ ДАННЫЕ В game.upgrades
+        // Апгрейды
         function renderUpgrades() {
             upgradesEl.innerHTML = '<h3 style="margin: 0 0 10px 0;">🏪 Апгрейды</h3>';
             
@@ -101,21 +134,20 @@
             ];
 
             upgrades.forEach(upgrade => {
-                const upgradeData = game.upgrades[upgrade.key];
-                const canBuy = game.shaurma >= upgradeData.cost;
+                const data = game.upgrades[upgrade.key];
+                const canBuy = game.shaurma >= data.cost;
                 
                 const el = document.createElement('div');
-                el.className = `upgrade ${!canBuy ? 'locked' : ''} ${upgradeData.level > 0 ? 'bought' : ''}`;
+                el.className = `upgrade ${!canBuy ? 'locked' : ''} ${data.level > 0 ? 'bought' : ''}`;
                 el.innerHTML = `
                     ${upgrade.name}<br>
-                    <small>${upgrade.desc} | ${upgradeData.cost.toLocaleString()} 🧆</small>
+                    <small>${upgrade.desc} | ${data.cost.toLocaleString()} 🧆</small>
                 `;
                 el.onclick = () => {
                     if (canBuy) {
-                        game.shaurma -= upgradeData.cost;
+                        game.shaurma -= data.cost;
                         upgrade.effect();
-                        // Цена растёт
-                        upgradeData.cost = Math.floor(upgradeData.cost * 1.5);
+                        data.cost = Math.floor(data.cost * 1.5);
                         updateDisplay();
                         renderUpgrades();
                         tg.HapticFeedback.notificationOccurred('success');
@@ -125,12 +157,10 @@
             });
         }
 
-        // СТАРТ
+        // ✅ СТАРТ
         updateDisplay();
         renderUpgrades();
-        
-        // DEBUG: Показываем статус сохранения
-        console.log('Game loaded:', game);
+        console.log('✅ Game loaded OK:', game);
     </script>
 </body>
 </html>
