@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Шаурма Империя v1.1.0</title>
+    <title>Шаурма Империя v1.3.0</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -23,10 +22,15 @@
             background: #ff4444; color: white; padding: 8px 12px; 
             border-radius: 20px; cursor: pointer; font-size: 12px;
         }
+        #debug { 
+            position: fixed; top: 50px; left: 10px; 
+            background: rgba(0,0,0,0.8); padding: 5px 10px; 
+            border-radius: 10px; font-size: 12px; max-width: 300px;
+        }
         #game { 
             display: flex; flex-direction: column; 
             align-items: center; justify-content: center; 
-            height: 100vh; padding-top: 60px; padding-bottom: 120px;
+            height: 100vh; padding-top: 80px; padding-bottom: 120px;
         }
         #shaurma { 
             font-size: 80px; cursor: pointer; 
@@ -45,189 +49,176 @@
             margin: 8px 0; padding: 15px; 
             border-radius: 12px; cursor: pointer; 
             font-size: 16px; transition: all 0.2s;
+            touch-action: manipulation;
         }
-        .upgrade:not(.locked):hover { background: rgba(255,255,255,0.25); }
-        .upgrade.locked { opacity: 0.4; cursor: not-allowed; }
+        .upgrade.ready { 
+            background: rgba(255,215,0,0.4); 
+            border: 2px solid #ffd700;
+            animation: pulse 1s infinite; 
+        }
         .upgrade.bought { background: rgba(0,255,0,0.3); border: 2px solid #00ff00; }
         .version { color: #ffd700; font-weight: bold; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
 <body>
     <div id="header">
-        <span class="version">v1.1.0</span> | 
-        <span id="debug">Загрузка...</span>
+        <span class="version">v1.3.0</span> | 
+        <span id="status">Загрузка...</span>
     </div>
-    <div id="reset-btn">🔄 Сбросить</div>
+    <div id="reset-btn">🔄 СБРОСИТЬ</div>
+    <div id="debug"></div>
     
     <div id="game">
         <div id="shaurma">🧆</div>
         <div id="stats">
             <div id="count">0 🧆</div>
             <div id="dps">0/сек</div>
+            <div id="tap-power">Тап: x1</div>
         </div>
     </div>
     
+    <!-- ✅ СТАТИЧНЫЕ КНОПКИ — НИКОГДА НЕ ЛОМАЮТСЯ -->
     <div id="upgrades">
-        <h3 style="margin-bottom: 15px;">🏪 Апгрейды</h3>
+        <h3>🏪 Апгрейды</h3>
+        <div id="tap-upgrade" class="upgrade">👐 Быстрые руки<br>Ур. <span id="tap-level">0</span><br><span id="tap-cost">50</span> 🧆</div>
+        <div id="helper-upgrade" class="upgrade">🤖 Помощник<br>Ур. <span id="helper-level">0</span><br><span id="helper-cost">200</span> 🧆</div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.ready(); tg.expand();
         
-        // ========== ГЛОБАЛЬНЫЕ ДАННЫЕ ==========
-        let gameData = {
-            version: '1.1.0',
+        // ========== ИГРА ==========
+        let game = {
+            version: '1.3.0',
             shaurma: 0,
             dps: 0,
             tapPower: 1,
-            upgrades: {
-                tap: { level: 0, baseCost: 50 },
-                helper: { level: 0, baseCost: 200 }
-            }
+            tapLevel: 0,
+            helperLevel: 0,
+            tapCost: 50,
+            helperCost: 200
         };
 
-        const elements = {
+        // ЭЛЕМЕНТЫ
+        const el = {
             shaurma: document.getElementById('shaurma'),
             count: document.getElementById('count'),
             dps: document.getElementById('dps'),
-            upgrades: document.getElementById('upgrades'),
+            tapPower: document.getElementById('tap-power'),
+            tapLevel: document.getElementById('tap-level'),
+            helperLevel: document.getElementById('helper-level'),
+            tapCost: document.getElementById('tap-cost'),
+            helperCost: document.getElementById('helper-cost'),
+            tapUpgrade: document.getElementById('tap-upgrade'),
+            helperUpgrade: document.getElementById('helper-upgrade'),
+            status: document.getElementById('status'),
             debug: document.getElementById('debug'),
             reset: document.getElementById('reset-btn')
         };
 
-        // ========== ФУНКЦИИ ==========
-        
-        // Полная загрузка
-        function loadGame() {
-            try {
-                const saved = localStorage.getItem('shaurma_v1.1');
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (parsed.version === '1.1.0') {
-                        gameData = parsed;
-                        elements.debug.textContent = `Загружено: ${Math.floor(gameData.shaurma).toLocaleString()} 🧆`;
+        // ✅ ЛОАД
+        function load() {
+            const saved = localStorage.getItem('shaurma_v1.3');
+            if (saved) {
+                try {
+                    const data = JSON.parse(saved);
+                    if (data.version === '1.3.0') {
+                        game = data;
+                        el.status.textContent = 'Загружено';
+                        el.debug.textContent = `Данные: ${Math.floor(game.shaurma)} 🧆`;
                         return;
                     }
-                }
-            } catch(e) {}
-            // Новая игра
-            resetGame();
-            elements.debug.textContent = 'Новая игра v1.1.0';
+                } catch(e) {}
+            }
+            reset();
+            el.status.textContent = 'Новая игра';
         }
 
-        // ✅ ПОЛНЫЙ СБРОС
-        function resetGame() {
-            localStorage.removeItem('shaurma_v1.1');
-            gameData = {
-                version: '1.1.0',
+        // ✅ СБРОС
+        function reset() {
+            localStorage.removeItem('shaurma_v1.3');
+            game = {
+                version: '1.3.0',
                 shaurma: 0,
                 dps: 0,
                 tapPower: 1,
-                upgrades: {
-                    tap: { level: 0, baseCost: 50 },    // ✅ БАЗОВЫЕ ЦЕНЫ
-                    helper: { level: 0, baseCost: 200 } // ✅ БАЗОВЫЕ ЦЕНЫ
-                }
+                tapLevel: 0,
+                helperLevel: 0,
+                tapCost: 50,
+                helperCost: 200
             };
-            updateDisplay();
-            renderUpgrades();
-            elements.debug.textContent = '✅ Полностью сброшено!';
-            tg.HapticFeedback.notificationOccurred('error');
+            update();
+            el.status.textContent = 'Сброшено';
+            el.debug.textContent = 'Цены: 50/200';
         }
 
-        // Сохранение
-        function saveGame() {
-            localStorage.setItem('shaurma_v1.1', JSON.stringify(gameData));
+        // ✅ UPDATE
+        function update() {
+            el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
+            el.dps.textContent = game.dps + '/сек';
+            el.tapPower.textContent = 'Тап: x' + game.tapPower;
+            el.tapLevel.textContent = game.tapLevel;
+            el.helperLevel.textContent = game.helperLevel;
+            el.tapCost.textContent = game.tapCost;
+            el.helperCost.textContent = game.helperCost;
+
+            // ✅ ЦВЕТА КНОПОК
+            el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
+            el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
+
+            localStorage.setItem('shaurma_v1.3', JSON.stringify(game));
         }
 
-        // Обновление экрана
-        function updateDisplay() {
-            elements.count.textContent = Math.floor(gameData.shaurma).toLocaleString() + ' 🧆';
-            elements.dps.textContent = Math.floor(gameData.dps).toLocaleString() + '/сек';
-            saveGame();
-        }
-
-        // 🖱️ ТАПЫ
-        elements.shaurma.onclick = () => {
-            gameData.shaurma += gameData.tapPower;
-            updateDisplay();
+        // ✅ ТАП
+        el.shaurma.onclick = () => {
+            game.shaurma += game.tapPower;
+            update();
             tg.HapticFeedback.impactOccurred('light');
-            elements.shaurma.style.transform = 'scale(0.9)';
-            setTimeout(() => elements.shaurma.style.transform = 'scale(1)', 100);
+            el.shaurma.style.transform = 'scale(0.9)';
+            setTimeout(() => el.shaurma.style.transform = '', 100);
         };
 
-        // 💰 ПАССИВКА
+        // ✅ ПАССИВКА
         setInterval(() => {
-            gameData.shaurma += gameData.dps;
-            updateDisplay();
+            game.shaurma += game.dps;
+            update();
         }, 1000);
 
-        // 🏪 АПГРЕЙДЫ — ✅ РАБОТАЕТ МИГОВОЙ
-        function renderUpgrades() {
-            const upgrades = [
-                {
-                    id: 'tap',
-                    emoji: '👐',
-                    name: 'Быстрые руки',
-                    getCost: () => Math.floor(gameData.upgrades.tap.baseCost * Math.pow(1.15, gameData.upgrades.tap.level)),
-                    buy: () => {
-                        gameData.upgrades.tap.level++;
-                        gameData.tapPower++;
-                    }
-                },
-                {
-                    id: 'helper',
-                    emoji: '🤖',
-                    name: 'Помощник',
-                    getCost: () => Math.floor(gameData.upgrades.helper.baseCost * Math.pow(1.2, gameData.upgrades.helper.level)),
-                    buy: () => {
-                        gameData.upgrades.helper.level++;
-                        gameData.dps++;
-                    }
-                }
-            ];
+        // ✅ АПГРЕЙДЫ — СТАТИЧНЫЕ КНОПКИ
+        el.tapUpgrade.onclick = () => {
+            if (game.shaurma >= game.tapCost) {
+                game.shaurma -= game.tapCost;
+                game.tapLevel++;
+                game.tapPower++;
+                game.tapCost = Math.floor(game.tapCost * 1.15);
+                update();
+                tg.HapticFeedback.notificationOccurred('success');
+                el.debug.textContent = 'Куплен тап-апгрейд!';
+            }
+        };
 
-            elements.upgrades.innerHTML = '<h3 style="margin-bottom: 15px;">🏪 Апгрейды</h3>';
-            
-            upgrades.forEach(upgrade => {
-                const cost = upgrade.getCost();
-                const canBuy = gameData.shaurma >= cost;
-                
-                const div = document.createElement('div');
-                div.className = `upgrade ${canBuy ? '' : 'locked'} ${upgrade.id === 'tap' && gameData.upgrades.tap.level > 0 ? 'bought' : ''}`;
-                div.innerHTML = `
-                    <div style="font-size: 18px; margin-bottom: 5px;">${upgrade.emoji} ${upgrade.name}</div>
-                    <div style="font-size: 14px; opacity: 0.8;">
-                        Ур. ${upgrade.id === 'tap' ? gameData.upgrades.tap.level : gameData.upgrades.helper.level}
-                    </div>
-                    <div style="font-size: 16px; margin-top: 8px; color: ${canBuy ? '#ffd700' : '#888'};">
-                        ${cost.toLocaleString()} 🧆
-                    </div>
-                `;
-                
-                div.onclick = () => {
-                    if (canBuy) {
-                        gameData.shaurma -= cost;
-                        upgrade.buy();
-                        updateDisplay();
-                        renderUpgrades();
-                        tg.HapticFeedback.notificationOccurred('success');
-                    }
-                };
-                
-                elements.upgrades.appendChild(div);
-            });
-        }
+        el.helperUpgrade.onclick = () => {
+            if (game.shaurma >= game.helperCost) {
+                game.shaurma -= game.helperCost;
+                game.helperLevel++;
+                game.dps++;
+                game.helperCost = Math.floor(game.helperCost * 1.2);
+                update();
+                tg.HapticFeedback.notificationOccurred('success');
+                el.debug.textContent = 'Куплен помощник!';
+            }
+        };
 
-        // КНОПКА СБРОСА
-        elements.reset.onclick = resetGame;
+        // ✅ РЕСЕТ
+        el.reset.onclick = reset;
 
-        // 🚀 ЗАПУСК
-        loadGame();
-        updateDisplay();
-        renderUpgrades();
+        // ✅ СТАРТ
+        load();
+        update();
         
-        console.log('✅ v1.1.0 запущена!');
+        console.log('✅ v1.3.0 — СТАТИЧНЫЕ КНОПКИ');
     </script>
 </body>
 </html>
