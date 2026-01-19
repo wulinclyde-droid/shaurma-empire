@@ -4,31 +4,89 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { margin: 0; background: #1a1a1a; color: white; font-family: Arial; }
-        #game { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #shaurma { font-size: 48px; cursor: pointer; }
-        #count { font-size: 24px; margin: 20px 0; }
+        body { margin: 0; background: linear-gradient(45deg, #ff6b35, #f7931e); color: white; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif; }
+        #game { width: 100vw; height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        #shaurma { font-size: 64px; cursor: pointer; transition: transform 0.1s; margin-bottom: 20px; }
+        #shaurma:active { transform: scale(0.95); }
+        #stats { font-size: 20px; margin: 10px 0; }
+        #upgrades { position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.8); padding: 15px; border-radius: 15px; max-height: 200px; overflow-y: auto; }
+        .upgrade { background: rgba(255,255,255,0.2); margin: 5px 0; padding: 10px; border-radius: 10px; cursor: pointer; }
+        .upgrade.locked { opacity: 0.5; cursor: not-allowed; }
     </style>
 </head>
 <body>
     <div id="game">
         <div id="shaurma">🧆 Шаурма</div>
-        <div id="count">Шаурм: 0</div>
+        <div id="stats">
+            <div id="count">Шаурм: 0</div>
+            <div id="dps">Доход/сек: 0</div>
+        </div>
     </div>
+    <div id="upgrades"></div>
+
     <script>
         const tg = window.Telegram.WebApp;
-        tg.ready();
-        tg.expand();
+        tg.ready(); tg.expand(); tg.MainButton.setText('Сохранить').show();
 
-        let count = 0;
+        let game = JSON.parse(localStorage.getItem('shaurmaGame')) || {
+            shaurma: 0,
+            dps: 0,
+            upgrades: { tap: 0, helper: 0 }
+        };
+
         const shaurma = document.getElementById('shaurma');
         const countEl = document.getElementById('count');
+        const dpsEl = document.getElementById('dps');
+        const upgradesEl = document.getElementById('upgrades');
 
+        function updateDisplay() {
+            countEl.textContent = `Шаурм: ${Math.floor(game.shaurma)}`;
+            dpsEl.textContent = `Доход/сек: ${game.dps}`;
+            localStorage.setItem('shaurmaGame', JSON.stringify(game));
+        }
+
+        // Тап
         shaurma.onclick = () => {
-            count++;
-            countEl.textContent = `Шаурм: ${count}`;
+            game.shaurma += 1 + game.upgrades.tap;
+            updateDisplay();
             tg.HapticFeedback.impactOccurred('light');
         };
+
+        // Пассивный доход
+        setInterval(() => {
+            game.shaurma += game.dps;
+            updateDisplay();
+        }, 1000);
+
+        // Апгрейды
+        const upgrades = [
+            { id: 'tap', name: '👐 Быстрые руки', cost: 50, effect: () => game.upgrades.tap++, dpsCost: 0 },
+            { id: 'helper', name: '🤖 Помощник', cost: 200, effect: () => { game.upgrades.helper++; game.dps += 1; }, dpsCost: 1 }
+        ];
+
+        function renderUpgrades() {
+            upgradesEl.innerHTML = '<h3 style="margin: 0 0 10px 0;">🏪 Апгрейды</h3>';
+            upgrades.forEach(upgrade => {
+                const canBuy = game.shaurma >= upgrade.cost;
+                const el = document.createElement('div');
+                el.className = `upgrade ${!canBuy ? 'locked' : ''}`;
+                el.innerHTML = `${upgrade.name}<br><small>${upgrade.cost} 🧆</small>`;
+                el.onclick = () => {
+                    if (canBuy) {
+                        game.shaurma -= upgrade.cost;
+                        upgrade.effect();
+                        upgrade.cost = Math.floor(upgrade.cost * 1.5);
+                        updateDisplay();
+                        renderUpgrades();
+                    }
+                };
+                upgradesEl.appendChild(el);
+            });
+        }
+
+        tg.MainButton.onclick = updateDisplay;
+        updateDisplay();
+        renderUpgrades();
     </script>
 </body>
 </html>
