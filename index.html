@@ -1,328 +1,249 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
+
+<!-- =========================
+     BLOCK: META / TELEGRAM
+========================= -->
 <head>
-    <title>Шаурма Империя v1.4.1</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <meta charset="UTF-8">
+    <title>Шаурма Империя</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<!-- =========================
+     BLOCK: STYLES (GLOBAL)
+========================= -->
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: linear-gradient(45deg, #ff6b35, #f7931e); 
-            color: white; 
+        body {
+            height: 100vh;
+            background: linear-gradient(45deg, #ff6b35, #f7931e);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            height: 100vh; overflow: hidden;
+            color: white;
+            overflow: hidden;
         }
-        #header { 
-            position: fixed; top: 0; left: 0; right: 0; 
-            background: rgba(0,0,0,0.9); padding: 5px; text-align: center; 
-            font-size: 12px; z-index: 100; height: 30px;
+
+        .hidden { display: none; }
+        .btn {
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: none;
+            cursor: pointer;
         }
-        #reset-btn { 
-            position: fixed; top: 35px; right: 10px; 
-            background: #ff4444; color: white; padding: 8px 12px; 
-            border-radius: 20px; cursor: pointer; font-size: 12px; z-index: 101;
-        }
-        #tasks-btn {
-            position: fixed; top: 35px; left: 10px; 
-            background: #4CAF50; color: white; border: none; padding: 8px 12px; 
-            border-radius: 20px; cursor: pointer; font-size: 12px; z-index: 101;
-        }
-        #debug { 
-            position: fixed; top: 70px; left: 10px; 
-            background: rgba(0,0,0,0.8); padding: 5px 8px; 
-            border-radius: 10px; font-size: 11px; max-width: 200px; z-index: 101;
-        }
-        #tasks {
-            position: fixed; top: 110px; right: 10px; 
-            background: rgba(0,0,0,0.95); padding: 15px; border-radius: 15px; 
-            max-width: 250px; display: none; z-index: 102; font-size: 14px;
-        }
-        #game { 
-            display: flex; flex-direction: column; 
-            align-items: center; justify-content: center; 
-            height: 100vh; padding-top: 120px; padding-bottom: 120px;
-        }
-        #shaurma { 
-            font-size: 80px; cursor: pointer; 
-            transition: all 0.1s; user-select: none;
-            margin-bottom: 20px;
-        }
-        #shaurma:active { transform: scale(0.9); }
-        #stats { text-align: center; font-size: 24px; margin: 10px 0; }
-        #upgrades { 
-            position: fixed; bottom: 0; left: 0; right: 0; 
-            background: rgba(0,0,0,0.95); padding: 20px; 
-            max-height: 35vh; overflow-y: auto;
-        }
-        .upgrade { 
-            background: rgba(255,255,255,0.15); 
-            margin: 8px 0; padding: 15px; 
-            border-radius: 12px; cursor: pointer; 
-            font-size: 16px; transition: all 0.2s;
-            touch-action: manipulation;
-        }
-        .upgrade.ready { 
-            background: rgba(255,215,0,0.4); 
-            border: 2px solid #ffd700;
-            animation: pulse 1s infinite; 
-        }
-        .upgrade.bought { background: rgba(0,255,0,0.3); border: 2px solid #00ff00; }
-        .version { color: #ffd700; font-weight: bold; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
     </style>
 </head>
+
 <body>
-    <div id="header">
-        <span class="version">v1.4.1</span> | 
-        <span id="status">Загрузка...</span>
+
+<!-- =========================
+     BLOCK: UI_HEADER
+========================= -->
+<header id="header" style="
+    position: fixed; top: 0; left: 0; right: 0;
+    height: 30px;
+    background: rgba(0,0,0,0.9);
+    text-align: center;
+    font-size: 12px;
+    line-height: 30px;
+    z-index: 100;
+">
+    <span style="color:#ffd700;">v1.4.3</span> |
+    <span id="status">Загрузка...</span>
+</header>
+
+<!-- =========================
+     BLOCK: UI_OVERLAY (BUTTONS / DEBUG)
+========================= -->
+<div style="position: fixed; top: 35px; left: 10px; z-index:101;">
+    <button id="tasks-btn" class="btn" style="background:#4CAF50;">📋 Задания</button>
+</div>
+
+<div style="position: fixed; top: 35px; right: 10px; z-index:101;">
+    <button id="reset-btn" class="btn" style="background:#ff4444;">🔄 Сброс</button>
+</div>
+
+<div id="debug" style="
+    position: fixed; top: 70px; left: 10px;
+    background: rgba(0,0,0,0.8);
+    padding: 6px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    z-index:101;
+">...</div>
+
+<!-- =========================
+     BLOCK: UI_TAP_SCENE (MAIN GAME)
+========================= -->
+<main id="tap-scene" style="
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-top: 120px;
+    padding-bottom: 120px;
+">
+    <!-- TAP OBJECT -->
+    <div id="tap-object" style="
+        font-size: 90px;
+        cursor: pointer;
+        user-select: none;
+        transition: transform 0.1s;
+    ">🧆</div>
+
+    <!-- STATS -->
+    <div id="stats" style="text-align:center; margin-top:20px; font-size:22px;">
+        <div id="count">0 🧆</div>
+        <div id="dps">0 / сек</div>
+        <div id="tap-power">Тап: x1</div>
     </div>
-    <button id="tasks-btn">📋 Задания</button>
-    <button id="reset-btn">🔄 Сброс</button>
-    <div id="debug">Готово</div>
-    <div id="tasks">
-        <h4>📋 Задания дня</h4>
-        <div id="task-list"></div>
-    </div>
-    
-    <div id="game">
-        <div id="shaurma">🧆</div>
-        <div id="stats">
-            <div id="count">0 🧆</div>
-            <div id="dps">0/сек</div>
-            <div id="tap-power">Тап: x1</div>
-        </div>
-    </div>
-    
-    <div id="upgrades">
-        <h3>🏪 Апгрейды</h3>
-        <div id="tap-upgrade" class="upgrade">👐 Быстрые руки<br>Ур. <span id="tap-level">0</span><br><span id="tap-cost">50</span> 🧆</div>
-        <div id="helper-upgrade" class="upgrade">🤖 Помощник<br>Ур. <span id="helper-level">0</span><br><span id="helper-cost">200</span> 🧆</div>
+</main>
+
+<!-- =========================
+     BLOCK: UI_TASKS
+========================= -->
+<section id="tasks-panel" class="hidden" style="
+    position: fixed; top: 110px; right: 10px;
+    background: rgba(0,0,0,0.95);
+    padding: 15px;
+    border-radius: 15px;
+    max-width: 260px;
+    z-index:102;
+">
+    <h4>📋 Задания</h4>
+    <div id="task-list"></div>
+</section>
+
+<!-- =========================
+     BLOCK: UI_UPGRADES
+========================= -->
+<section id="upgrades" style="
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.95);
+    padding: 20px;
+    max-height: 35vh;
+    overflow-y: auto;
+">
+    <h3>🏪 Апгрейды</h3>
+
+    <div id="tap-upgrade" class="upgrade">👐 Быстрые руки<br>
+        Ур. <span id="tap-level">0</span><br>
+        <span id="tap-cost">50</span> 🧆
     </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.ready(); tg.expand();
-        
-        const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
-        
-        let game = {
-            version: '1.4.3',
-            shaurma: 0,
-            dps: 0,
-            tapPower: 1,
-            tapLevel: 0,
-            helperLevel: 0,
-            tapCost: 50,
-            helperCost: 200,
-            tapsCount: 0,        // ✅ СЧЁТЧИК ТАПОВ
-            tasksDone: [false, false, false]  // ✅ СОСТОЯНИЕ ЗАДАНИЙ
-        };
-        
-        const el = {
-            shaurma: document.getElementById('shaurma'),
-            count: document.getElementById('count'),
-            dps: document.getElementById('dps'),
-            tapPower: document.getElementById('tap-power'),
-            tapLevel: document.getElementById('tap-level'),
-            helperLevel: document.getElementById('helper-level'),
-            tapCost: document.getElementById('tap-cost'),
-            helperCost: document.getElementById('helper-cost'),
-            tapUpgrade: document.getElementById('tap-upgrade'),
-            helperUpgrade: document.getElementById('helper-upgrade'),
-            status: document.getElementById('status'),
-            debug: document.getElementById('debug'),
-            reset: document.getElementById('reset-btn'),
-            tasksBtn: document.getElementById('tasks-btn'),
-            tasks: document.getElementById('tasks')
-        };
-        
-        // ✅ ЗАДАНИЯ С НАГРАДАМИ
-        const tasks = [
-            { 
-                id: 0, 
-                name: '50 тапов', 
-                progress: () => game.tapsCount, 
-                goal: 50, 
-                reward: 100,
-                claimed: false 
-            },
-            { 
-                id: 1, 
-                name: '1 апгрейд', 
-                progress: () => game.tapLevel + game.helperLevel, 
-                goal: 1, 
-                reward: 250,
-                claimed: false 
-            },
-            { 
-                id: 2, 
-                name: '200 шаурмы', 
-                progress: () => Math.floor(game.shaurma), 
-                goal: 200, 
-                reward: 500,
-                claimed: false 
-            }
-        ];
-        
-        function renderTasks() {
-            const taskList = document.getElementById('task-list');
-            taskList.innerHTML = '';
-            
-            tasks.forEach((task, index) => {
-                const progress = task.progress();
-                const done = progress >= task.goal && !task.claimed;
-                
-                const div = document.createElement('div');
-                div.style.margin = '8px 0';
-                div.style.padding = '12px';
-                div.style.background = done ? 'rgba(76, 175, 80, 0.4)' : 
-                                       task.claimed ? 'rgba(0, 255, 0, 0.2)' : 
-                                       'rgba(255,255,255,0.1)';
-                div.style.borderRadius = '8px';
-                div.style.cursor = done ? 'pointer' : 'default';
-                
-                div.innerHTML = `
-                    <div style="font-weight: bold; font-size: 14px;">
-                        ${task.claimed ? '🎁' : done ? '✅' : '🔄'} ${task.name}
-                    </div>
-                    <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
-                        ${progress}/${task.goal} 
-                        → <span style="color: #ffd700;">${task.reward.toLocaleString()}</span> 🧆
-                    </div>
-                `;
-                
-                // ✅ НАЖАТИЕ ДЛЯ НАГРАДЫ
-                div.onclick = () => {
-                    if (done) {
-                        game.shaurma += task.reward;
-                        task.claimed = true;
-                        game.tasksDone[index] = true;
-                        update();
-                        renderTasks();
-                        tg.HapticFeedback.notificationOccurred('success');
-                    }
-                };
-                
-                taskList.appendChild(div);
-            });
-        }
-        
-        // Загрузка
-        function load() {
-            const saved = localStorage.getItem('shaurma_v1.4');
-            if (saved) {
-                try {
-                    const data = JSON.parse(saved);
-                    if (data.version === '1.4.3') {
-                        game = { ...game, ...data };
-                        // Восстанавливаем задания
-                        tasks.forEach((task, i) => task.claimed = game.tasksDone?.[i] || false);
-                        el.status.textContent = 'Загружено';
-                        return;
-                    }
-                } catch(e) {}
-            }
-            el.status.textContent = 'Новое сохранение';
-        }
-        
-        // Сброс
-        function reset() {
-            localStorage.removeItem('shaurma_v1.4');
-            game = {
-                version: '1.4.3',
-                shaurma: 0,
-                dps: 0,
-                tapPower: 1,
-                tapLevel: 0,
-                helperLevel: 0,
-                tapCost: 50,
-                helperCost: 200,
-                tapsCount: 0,
-                tasksDone: [false, false, false]
-            };
-            tasks.forEach(task => task.claimed = false);
-            update();
-            el.status.textContent = 'Сброшено';
-        }
-        
-        // ✅ ОБНОВЛЕНИЕ
-        async function update() {
-            el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
-            el.dps.textContent = game.dps + '/сек';
-            el.tapPower.textContent = 'Тап: x' + game.tapPower;
-            el.tapLevel.textContent = game.tapLevel;
-            el.helperLevel.textContent = game.helperLevel;
-            el.tapCost.textContent = game.tapCost;
-            el.helperCost.textContent = game.helperCost;
-        
-            el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
-            el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
-        
-            // Облако
-            try {
-                await fetch('/api/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(game)
-                });
-                el.debug.textContent = '☁️ v1.4.3';
-            } catch(e) {
-                el.debug.textContent = 'Локально';
-            }
-            
-            localStorage.setItem('shaurma_v1.4', JSON.stringify(game));
-        }
-        
-        // ✅ ТАП С СЧЁТЧИКОМ
-        el.shaurma.onclick = () => {
-            game.shaurma += game.tapPower;
-            game.tapsCount++;  // ✅ СЧИТАЕМ ТАПЫ
-            update();
-            tg.HapticFeedback.impactOccurred('light');
-            el.shaurma.style.transform = 'scale(0.9)';
-            setTimeout(() => el.shaurma.style.transform = '', 100);
-        };
-        
-        // Пассивка
-        setInterval(() => {
-            game.shaurma += game.dps;
-            update();
-        }, 1000);
-        
-        // Апгрейды
-        el.tapUpgrade.onclick = () => {
-            if (game.shaurma >= game.tapCost) {
-                game.shaurma -= game.tapCost;
-                game.tapLevel++;
-                game.tapPower++;
-                game.tapCost = Math.floor(game.tapCost * 1.15);
-                update();
-                tg.HapticFeedback.notificationOccurred('success');
-            }
-        };
-        
-        el.helperUpgrade.onclick = () => {
-            if (game.shaurma >= game.helperCost) {
-                game.shaurma -= game.helperCost;
-                game.helperLevel++;
-                game.dps++;
-                game.helperCost = Math.floor(game.helperCost * 1.2);
-                update();
-                tg.HapticFeedback.notificationOccurred('success');
-            }
-        };
-        
-        // Кнопки
-        el.reset.onclick = reset;
-        el.tasksBtn.onclick = () => {
-            el.tasks.style.display = el.tasks.style.display === 'block' ? 'none' : 'block';
-            if (el.tasks.style.display === 'block') renderTasks();
-        };
-        
-        // Запуск
-        load();
+    <div id="helper-upgrade" class="upgrade">🤖 Помощник<br>
+        Ур. <span id="helper-level">0</span><br>
+        <span id="helper-cost">200</span> 🧆
+    </div>
+</section>
+
+<!-- =========================
+     BLOCK: GAME_LOGIC
+========================= -->
+<script>
+/* ───────── TELEGRAM ───────── */
+const tg = window.Telegram.WebApp;
+tg.ready(); tg.expand();
+
+/* ───────── GAME STATE ───────── */
+let game = {
+    version: '1.4.3',
+    shaurma: 0,
+    dps: 0,
+    tapPower: 1,
+    tapLevel: 0,
+    helperLevel: 0,
+    tapCost: 50,
+    helperCost: 200,
+    tapsCount: 0,
+    tasksDone: [false,false,false]
+};
+
+/* ───────── ELEMENTS ───────── */
+const el = {
+    tap: document.getElementById('tap-object'),
+    count: document.getElementById('count'),
+    dps: document.getElementById('dps'),
+    tapPower: document.getElementById('tap-power'),
+    tapLevel: document.getElementById('tap-level'),
+    helperLevel: document.getElementById('helper-level'),
+    tapCost: document.getElementById('tap-cost'),
+    helperCost: document.getElementById('helper-cost'),
+    tapUpgrade: document.getElementById('tap-upgrade'),
+    helperUpgrade: document.getElementById('helper-upgrade'),
+    status: document.getElementById('status'),
+    debug: document.getElementById('debug'),
+    reset: document.getElementById('reset-btn'),
+    tasksBtn: document.getElementById('tasks-btn'),
+    tasksPanel: document.getElementById('tasks-panel')
+};
+
+/* ───────── UPDATE UI ───────── */
+function update() {
+    el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
+    el.dps.textContent = game.dps + ' / сек';
+    el.tapPower.textContent = 'Тап: x' + game.tapPower;
+    el.tapLevel.textContent = game.tapLevel;
+    el.helperLevel.textContent = game.helperLevel;
+    el.tapCost.textContent = game.tapCost;
+    el.helperCost.textContent = game.helperCost;
+    localStorage.setItem('shaurma_save', JSON.stringify(game));
+}
+
+/* ───────── TAP ───────── */
+el.tap.onclick = () => {
+    game.shaurma += game.tapPower;
+    game.tapsCount++;
+    el.tap.style.transform = 'scale(0.9)';
+    setTimeout(()=>el.tap.style.transform='',100);
+    tg.HapticFeedback.impactOccurred('light');
+    update();
+};
+
+/* ───────── PASSIVE ───────── */
+setInterval(()=>{
+    game.shaurma += game.dps;
+    update();
+},1000);
+
+/* ───────── UPGRADES ───────── */
+el.tapUpgrade.onclick = () => {
+    if (game.shaurma >= game.tapCost) {
+        game.shaurma -= game.tapCost;
+        game.tapLevel++;
+        game.tapPower++;
+        game.tapCost = Math.floor(game.tapCost * 1.15);
         update();
-    </script>
+    }
+};
+
+el.helperUpgrade.onclick = () => {
+    if (game.shaurma >= game.helperCost) {
+        game.shaurma -= game.helperCost;
+        game.helperLevel++;
+        game.dps++;
+        game.helperCost = Math.floor(game.helperCost * 1.2);
+        update();
+    }
+};
+
+/* ───────── UI ───────── */
+el.reset.onclick = () => {
+    localStorage.removeItem('shaurma_save');
+    location.reload();
+};
+
+el.tasksBtn.onclick = () => {
+    el.tasksPanel.classList.toggle('hidden');
+};
+
+/* ───────── START ───────── */
+const saved = localStorage.getItem('shaurma_save');
+if (saved) game = { ...game, ...JSON.parse(saved) };
+el.status.textContent = 'Готово';
+update();
+</script>
 
 </body>
 </html>
