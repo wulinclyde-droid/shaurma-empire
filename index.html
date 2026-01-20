@@ -213,6 +213,52 @@ function updateKioskImage() {
     }
 }
 
+
+// ==========================
+// TAP ANIMATION + FLOATING NUMBERS
+// ==========================
+el.shaurma.onclick = () => {
+    const tapPower = game.tapPower || 1;
+
+    // 1️⃣ Добавляем к общему счету
+    game.shaurma += tapPower;
+    game.tapsCount++; // считаем тап
+    update();
+
+    // 2️⃣ Анимация самой шаурмы
+    el.shaurma.style.transform = 'scale(0.9)';
+    setTimeout(() => el.shaurma.style.transform = '', 100);
+
+    // 3️⃣ Плавающее число
+    const floatEl = document.createElement('div');
+    floatEl.textContent = `+${tapPower} 🧆`;
+    floatEl.style.position = 'absolute';
+    floatEl.style.left = '50%';
+    floatEl.style.bottom = '50px'; // чуть выше шаурмы
+    floatEl.style.transform = 'translateX(-50%)';
+    floatEl.style.color = '#ffd700';
+    floatEl.style.fontWeight = 'bold';
+    floatEl.style.fontSize = '18px';
+    floatEl.style.opacity = '1';
+    floatEl.style.transition = 'all 1s ease-out';
+    document.getElementById('tap-float-container').appendChild(floatEl);
+
+    // 4️⃣ Анимация движения вверх и исчезания
+    setTimeout(() => {
+        floatEl.style.bottom = '100px';
+        floatEl.style.opacity = '0';
+    }, 50);
+
+    // 5️⃣ Удаляем элемент после анимации
+    setTimeout(() => {
+        floatEl.remove();
+    }, 1050);
+
+    // 6️⃣ Haptic Feedback (для Telegram WebApp)
+    tg.HapticFeedback.impactOccurred('light');
+};
+
+
      
 /* ───────── ELEMENTS ───────── */
 const el = {
