@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         user_id: String(userId),
-         safeData
+        data: safeData
       })
     });
 
