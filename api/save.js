@@ -6,6 +6,10 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const BOT_TOKEN = '8541029796:AAHDRrnhEGHsgMNNfV6IIrpZTRM5DuKfza8'; 
 
 export default async function handler(req, res) {
+    // В самом начале handler в api/save.js
+  console.log('📥 Save request received');
+  console.log('User ID:', userId);
+  console.log('InitData length:', initData?.length);
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
@@ -45,10 +49,11 @@ export default async function handler(req, res) {
       console.error('Supabase error:', errorText);
       return res.status(500).json({ error: 'Supabase save failed', details: errorText });
     }
-
-    res.json({ success: true });
+  console.log('✅ Saved successfully for user', userId);
+  res.json({ success: true });
   } catch (error) {
     console.error('Save error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
+
 }
