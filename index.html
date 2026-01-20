@@ -168,13 +168,20 @@
      BLOCK: GAME_LOGIC
 ========================= -->
 <script>
-/* ───────── TELEGRAM ───────── */
+// ==========================
+// MODULE: SHAURMA IMPERIA v1.5
+// ==========================
 const tg = window.Telegram.WebApp;
-tg.ready(); tg.expand();
+tg.ready();
+tg.expand();
 
-/* ───────── GAME STATE ───────── */
+// ==========================
+// GAME STATE
+// ==========================
+const userId = tg.initDataUnsafe?.user?.id?.toString() || 'guest_' + Math.random().toString(36).slice(2);
+
 let game = {
-    version: '1.4.3',
+    version: '1.5',
     shaurma: 0,
     dps: 0,
     tapPower: 1,
@@ -183,86 +190,16 @@ let game = {
     tapCost: 50,
     helperCost: 200,
     tapsCount: 0,
-    tasksDone: [false,false,false]
+    tasksDone: [false, false, false]
 };
 
-const kioskLevels = [
-    { minLevel: 0, src: 'https://i.postimg.cc/g0y54NsY/kiosk-sma.png' },  // маленький
-    { minLevel: 5, src: 'https://i.postimg.cc/xdG7gt5n/kiosk-med.png' },  // средний
-    { minLevel: 10, src: 'https://i.postimg.cc/xdVhKWvj/kiosk-big.png' }  // большой
-];
-
-function updateKioskImage() {
-    let current = kioskLevels[0].src;
-
-    // выбираем картинку в зависимости от уровня
-    for (let i = 0; i < kioskLevels.length; i++) {
-        if (game.tapLevel >= kioskLevels[i].minLevel) {
-            current = kioskLevels[i].src;
-        }
-    }
-
-    const kioskImg = document.getElementById('kiosk-base');
-    if (kioskImg && kioskImg.src !== current) {
-        kioskImg.src = current;
-
-        // плавный эффект смены
-        kioskImg.style.transition = 'opacity 0.4s';
-        kioskImg.style.opacity = '0.5';
-        setTimeout(() => kioskImg.style.opacity = '1', 50);
-    }
-}
-
-
 // ==========================
-// TAP ANIMATION + FLOATING NUMBERS
+// DOM ELEMENTS
 // ==========================
-el.shaurma.onclick = () => {
-    const tapPower = game.tapPower || 1;
-
-    // 1️⃣ Добавляем к общему счету
-    game.shaurma += tapPower;
-    game.tapsCount++; // считаем тап
-    update();
-
-    // 2️⃣ Анимация самой шаурмы
-    el.shaurma.style.transform = 'scale(0.9)';
-    setTimeout(() => el.shaurma.style.transform = '', 100);
-
-    // 3️⃣ Плавающее число
-    const floatEl = document.createElement('div');
-    floatEl.textContent = `+${tapPower} 🧆`;
-    floatEl.style.position = 'absolute';
-    floatEl.style.left = '50%';
-    floatEl.style.bottom = '50px'; // чуть выше шаурмы
-    floatEl.style.transform = 'translateX(-50%)';
-    floatEl.style.color = '#ffd700';
-    floatEl.style.fontWeight = 'bold';
-    floatEl.style.fontSize = '18px';
-    floatEl.style.opacity = '1';
-    floatEl.style.transition = 'all 1s ease-out';
-    document.getElementById('tap-float-container').appendChild(floatEl);
-
-    // 4️⃣ Анимация движения вверх и исчезания
-    setTimeout(() => {
-        floatEl.style.bottom = '100px';
-        floatEl.style.opacity = '0';
-    }, 50);
-
-    // 5️⃣ Удаляем элемент после анимации
-    setTimeout(() => {
-        floatEl.remove();
-    }, 1050);
-
-    // 6️⃣ Haptic Feedback (для Telegram WebApp)
-    tg.HapticFeedback.impactOccurred('light');
-};
-
-
-     
-/* ───────── ELEMENTS ───────── */
 const el = {
-    tap: document.getElementById('tap-object'),
+    kioskContainer: document.getElementById('kiosk-container'),
+    kioskBase: document.getElementById('kiosk-base'),
+    tapObject: document.getElementById('tap-object'),
     count: document.getElementById('count'),
     dps: document.getElementById('dps'),
     tapPower: document.getElementById('tap-power'),
@@ -270,45 +207,180 @@ const el = {
     helperLevel: document.getElementById('helper-level'),
     tapCost: document.getElementById('tap-cost'),
     helperCost: document.getElementById('helper-cost'),
-    tapUpgrade: document.getElementById('tap-upgrade'),
-    helperUpgrade: document.getElementById('helper-upgrade'),
-    status: document.getElementById('status'),
-    debug: document.getElementById('debug'),
+    tapFloat: document.getElementById('tap-float-container'),
     reset: document.getElementById('reset-btn'),
     tasksBtn: document.getElementById('tasks-btn'),
-    tasksPanel: document.getElementById('tasks-panel')
+    tasks: document.getElementById('tasks'),
+    status: document.getElementById('status'),
+    debug: document.getElementById('debug')
 };
 
-/* ───────── UPDATE UI ───────── */
+// ==========================
+// KIOSK LEVELS
+// ==========================
+const kioskLevels = [
+    { minLevel: 0, src: 'https://i.postimg.cc/qtRjvcWY/kiosk-sma.png' },  // маленький
+    { minLevel: 5, src: 'https://i.postimg.cc/DWZBwQRM/kiosk-med.png' },  // средний
+    { minLevel: 10, src: 'https://i.postimg.cc/VJ4KwZZ2/kiosk-big.png' }  // большой
+];
+
+function updateKioskImage() {
+    let current = kioskLevels[0].src;
+    for (let i = 0; i < kioskLevels.length; i++) {
+        if (game.tapLevel >= kioskLevels[i].minLevel) current = kioskLevels[i].src;
+    }
+    if (el.kioskBase.src !== current) {
+        el.kioskBase.src = current;
+        el.kioskBase.style.transition = 'opacity 0.4s';
+        el.kioskBase.style.opacity = '0.5';
+        setTimeout(() => el.kioskBase.style.opacity = '1', 50);
+    }
+}
+
+// ==========================
+// TASKS
+// ==========================
+const tasks = [
+    { id: 0, name: '50 тапов', progress: () => game.tapsCount, goal: 50, reward: 100, claimed: false },
+    { id: 1, name: '1 апгрейд', progress: () => game.tapLevel + game.helperLevel, goal: 1, reward: 250, claimed: false },
+    { id: 2, name: '200 шаурмы', progress: () => Math.floor(game.shaurma), goal: 200, reward: 500, claimed: false }
+];
+
+function renderTasks() {
+    const taskList = document.getElementById('task-list');
+    taskList.innerHTML = '';
+    tasks.forEach((task, i) => {
+        const progress = task.progress();
+        const done = progress >= task.goal && !task.claimed;
+        const div = document.createElement('div');
+        div.style.margin = '8px 0';
+        div.style.padding = '12px';
+        div.style.borderRadius = '8px';
+        div.style.cursor = done ? 'pointer' : 'default';
+        div.style.background = done ? 'rgba(76,175,80,0.4)' : task.claimed ? 'rgba(0,255,0,0.2)' : 'rgba(255,255,255,0.1)';
+        div.innerHTML = `
+            <div style="font-weight:bold;font-size:14px;">${task.claimed ? '🎁' : done ? '✅' : '🔄'} ${task.name}</div>
+            <div style="font-size:12px; opacity:0.9; margin-top:4px;">
+                ${progress}/${task.goal} → <span style="color:#ffd700;">${task.reward}</span> 🧆
+            </div>
+        `;
+        div.onclick = () => {
+            if (done) {
+                game.shaurma += task.reward;
+                task.claimed = true;
+                game.tasksDone[i] = true;
+                update();
+                renderTasks();
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        };
+        taskList.appendChild(div);
+    });
+}
+
+// ==========================
+// LOAD / SAVE
+// ==========================
+function load() {
+    const saved = localStorage.getItem('shaurma_v1.5');
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+            game = { ...game, ...data };
+            tasks.forEach((t,i) => t.claimed = game.tasksDone[i] || false);
+            el.status.textContent = 'Загружено';
+            return;
+        } catch(e){}
+    }
+    el.status.textContent = 'Новое сохранение';
+}
+
+async function save() {
+    localStorage.setItem('shaurma_v1.5', JSON.stringify(game));
+    try {
+        await fetch('/api/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(game) });
+        el.debug.textContent = '☁️ v1.5';
+    } catch(e) {
+        el.debug.textContent = 'Локально';
+    }
+}
+
+// ==========================
+// RESET
+// ==========================
+function reset() {
+    localStorage.removeItem('shaurma_v1.5');
+    game = { version:'1.5', shaurma:0, dps:0, tapPower:1, tapLevel:0, helperLevel:0, tapCost:50, helperCost:200, tapsCount:0, tasksDone:[false,false,false] };
+    tasks.forEach(t => t.claimed=false);
+    update();
+    el.status.textContent = 'Сброшено';
+}
+
+// ==========================
+// UPDATE STATS
+// ==========================
 function update() {
     el.count.textContent = Math.floor(game.shaurma) + ' 🧆';
-    el.dps.textContent = game.dps + ' / сек';
+    el.dps.textContent = game.dps + '/сек';
     el.tapPower.textContent = 'Тап: x' + game.tapPower;
     el.tapLevel.textContent = game.tapLevel;
     el.helperLevel.textContent = game.helperLevel;
     el.tapCost.textContent = game.tapCost;
     el.helperCost.textContent = game.helperCost;
+
+    // апгрейд кнопки готовности
+    el.tapUpgrade.className = game.shaurma >= game.tapCost ? 'upgrade ready' : 'upgrade';
+    el.helperUpgrade.className = game.shaurma >= game.helperCost ? 'upgrade ready' : 'upgrade';
+
     updateKioskImage();
-    localStorage.setItem('shaurma_save', JSON.stringify(game));
+    save();
 }
 
-/* ───────── TAP ───────── */
-el.tap.onclick = () => {
-    game.shaurma += game.tapPower;
+// ==========================
+// PASSIVE INCOME
+// ==========================
+setInterval(() => { game.shaurma += game.dps; update(); }, 1000);
+
+// ==========================
+// TAP ANIMATION + FLOATING NUMBERS
+// ==========================
+el.tapObject.onclick = () => {
+    const tapPower = game.tapPower || 1;
+    game.shaurma += tapPower;
     game.tapsCount++;
-    el.tap.style.transform = 'scale(0.9)';
-    setTimeout(()=>el.tap.style.transform='',100);
-    tg.HapticFeedback.impactOccurred('light');
     update();
+
+    // анимация шаурмы
+    el.tapObject.style.transform = 'scale(0.9)';
+    setTimeout(() => el.tapObject.style.transform = '', 100);
+
+    // плавающее число
+    const floatEl = document.createElement('div');
+    floatEl.textContent = `+${tapPower} 🧆`;
+    floatEl.style.position = 'absolute';
+    floatEl.style.left = '50%';
+    floatEl.style.bottom = '50px';
+    floatEl.style.transform = 'translateX(-50%)';
+    floatEl.style.color = '#ffd700';
+    floatEl.style.fontWeight = 'bold';
+    floatEl.style.fontSize = '18px';
+    floatEl.style.opacity = '1';
+    floatEl.style.transition = 'all 1s ease-out';
+    el.tapFloat.appendChild(floatEl);
+
+    setTimeout(() => {
+        floatEl.style.bottom = '100px';
+        floatEl.style.opacity = '0';
+    }, 50);
+
+    setTimeout(() => floatEl.remove(), 1050);
+
+    tg.HapticFeedback.impactOccurred('light');
 };
 
-/* ───────── PASSIVE ───────── */
-setInterval(()=>{
-    game.shaurma += game.dps;
-    update();
-},1000);
-
-/* ───────── UPGRADES ───────── */
+// ==========================
+// UPGRADES
+// ==========================
 el.tapUpgrade.onclick = () => {
     if (game.shaurma >= game.tapCost) {
         game.shaurma -= game.tapCost;
@@ -316,9 +388,9 @@ el.tapUpgrade.onclick = () => {
         game.tapPower++;
         game.tapCost = Math.floor(game.tapCost * 1.15);
         update();
+        tg.HapticFeedback.notificationOccurred('success');
     }
 };
-
 el.helperUpgrade.onclick = () => {
     if (game.shaurma >= game.helperCost) {
         game.shaurma -= game.helperCost;
@@ -326,24 +398,25 @@ el.helperUpgrade.onclick = () => {
         game.dps++;
         game.helperCost = Math.floor(game.helperCost * 1.2);
         update();
+        tg.HapticFeedback.notificationOccurred('success');
     }
 };
 
-/* ───────── UI ───────── */
-el.reset.onclick = () => {
-    localStorage.removeItem('shaurma_save');
-    location.reload();
-};
-
+// ==========================
+// BUTTONS
+// ==========================
+el.reset.onclick = reset;
 el.tasksBtn.onclick = () => {
-    el.tasksPanel.classList.toggle('hidden');
+    el.tasks.style.display = el.tasks.style.display === 'block' ? 'none' : 'block';
+    if (el.tasks.style.display === 'block') renderTasks();
 };
 
-/* ───────── START ───────── */
-const saved = localStorage.getItem('shaurma_save');
-if (saved) game = { ...game, ...JSON.parse(saved) };
-el.status.textContent = 'Готово';
+// ==========================
+// START
+// ==========================
+load();
 update();
+
 </script>
 
 </body>
