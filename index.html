@@ -322,34 +322,51 @@
     // ==========================
     // LOAD / SAVE
     // ==========================
-    function load() {
-      const saved = localStorage.getItem('shaurma_v1.5');
-      if (saved) {
-        try {
-          const data = JSON.parse(saved);
-          Object.assign(game, data);
-          tasks.forEach((t, i) => t.claimed = game.tasksDone[i] || false);
-          el.status.textContent = 'Загружено';
-          return;
-        } catch (e) {}
+  async function load() {
+    // Сначала пробуем облако
+    try {
+      const initData = tg.initData || '';
+      const res = await fetch(`/api/load?userId=${encodeURIComponent(userId)}&initData=${encodeURIComponent(initData)}`);
+      const cloudData = await res.json();
+      if (cloudData && cloudData.length > 0 && cloudData[0].data) {
+        Object.assign(game, cloudData[0].data);
+        tasks.forEach((t, i) => t.claimed = game.tasksDone[i] || false);
+        el.status.textContent = 'Облако';
+        update();
+        return;
       }
-      el.status.textContent = 'Новое сохранение';
+    } catch (e) {
+      console.warn('Cloud load failed:', e);
     }
-
-    async function save() {
-      localStorage.setItem('shaurma_v1.5', JSON.stringify(game));
+  
+    // Если облако не сработало — локальное
+    const saved = localStorage.getItem('shaurma_v1.5');
+    if (saved) {
       try {
-        // В будущем: отправим initData для безопасности
-        await fetch('/api/save', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, ...game })
-        });
-        el.debug.textContent = '☁️ v1.5';
-      } catch (e) {
-        el.debug.textContent = 'Локально';
-      }
+        const data = JSON.parse(saved);
+        Object.assign(game, data);
+        tasks.forEach((t, i) => t.claimed = game.tasksDone[i] || false);
+        el.status.textContent = 'Локально';
+        return;
+      } catch (e) {}
     }
+    el.status.textContent = 'Новое';
+  }
+
+  async function save() {
+    localStorage.setItem('shaurma_v1.5', JSON.stringify(game));
+    try {
+      const initData = tg.initData || '';
+      await fetch('/api/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, initData, ...game })
+      });
+      el.debug.textContent = '☁️ v1.5';
+    } catch (e) {
+      el.debug.textContent = 'Локально';
+    }
+  }
 
     // ==========================
     // RESET
