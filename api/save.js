@@ -6,28 +6,30 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const BOT_TOKEN = '8541029796:AAHDRrnhEGHsgMNNfV6IIrpZTRM5DuKfza8'; 
 
 export default async function handler(req, res) {
-    // В самом начале handler в api/save.js
-  console.log('📥 Save request received');
-  console.log('User ID:', userId);
-  console.log('InitData length:', initData?.length);
   if (req.method !== 'POST') return res.status(405).end();
 
   try {
-    const { userId, initData, ...gameData } = req.body;
+    const body = req.body;
+    const userId = body?.userId;
+    const initData = body?.initData;
+
+    if (!userId || !initData) {
+      return res.status(400).json({ error: 'Missing userId or initData' });
+    }
 
     if (!verifyInitData(initData, BOT_TOKEN)) {
       return res.status(403).json({ error: 'Invalid initData' });
     }
 
     const safeData = {
-      shaurma: Number(gameData.shaurma) || 0,
-      dps: Number(gameData.dps) || 0,
-      tapPower: Number(gameData.tapPower) || 1,
-      tapLevel: Number(gameData.tapLevel) || 0,
-      helperLevel: Number(gameData.helperLevel) || 0,
-      tapsCount: Number(gameData.tapsCount) || 0,
-      tasksDone: Array.isArray(gameData.tasksDone) ? gameData.tasksDone : [false, false, false],
-      version: String(gameData.version || '1.5')
+      shaurma: Number(body.shaurma) || 0,
+      dps: Number(body.dps) || 0,
+      tapPower: Number(body.tapPower) || 1,
+      tapLevel: Number(body.tapLevel) || 0,
+      helperLevel: Number(body.helperLevel) || 0,
+      tapsCount: Number(body.tapsCount) || 0,
+      tasksDone: Array.isArray(body.tasksDone) ? body.tasksDone : [false, false, false],
+      version: String(body.version || '1.5')
     };
 
     const response = await fetch(`${SUPABASE_URL}/rest/v1/shaurma`, {
@@ -40,20 +42,19 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         user_id: String(userId),
-         safeData   // ← КЛЮЧЕВОЙ МОМЕНТ!
+         safeData
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Supabase error:', errorText);
-      return res.status(500).json({ error: 'Supabase save failed', details: errorText });
+      return res.status(500).json({ error: 'Supabase save failed' });
     }
-  console.log('✅ Saved successfully for user', userId);
-  res.json({ success: true });
+
+    res.json({ success: true });
   } catch (error) {
     console.error('Save error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal error' });
   }
-
 }
