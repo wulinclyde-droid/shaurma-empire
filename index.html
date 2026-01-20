@@ -86,20 +86,19 @@
     position: relative;
 ">
 
-    <!-- TAP OBJECT (СПРАЙТ) -->
-    <div id="tap-object-container" style="
-        position: relative;
-        width: 150px;
-        height: 150px;
-        cursor: pointer;
-    ">
-        <img id="tap-object" src="https://i.ibb.co/20rcgDty/images.png" alt="Шаурма" style="
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-            transition: transform 0.1s;
-        ">
-    </div>
+     <!-- =========================
+          KIOSK + TAP OBJECT
+     ========================= -->
+     <div id="kiosk-container" style="position: relative; width:200px; height:200px; cursor: pointer;">
+         <!-- киоск -->
+         <img id="kiosk-base" src="https://i.postimg.cc/qtRjvcWY/kiosk-sma.png" 
+              alt="Киоск" style="width:100%; height:100%; object-fit:contain; transition: all 0.3s;">
+     
+         <!-- шаурма для тапа -->
+         <img id="tap-object" src="https://i.postimg.cc/20rcgDty/images.png" 
+              alt="Шаурма" style="position:absolute; bottom:20px; left:50%; transform:translateX(-50%); width:50px; transition: transform 0.1s;">
+     </div>
+
 
     <!-- STATS -->
     <div id="stats" style="
@@ -187,6 +186,34 @@ let game = {
     tasksDone: [false,false,false]
 };
 
+const kioskLevels = [
+    { minLevel: 0, src: 'https://i.postimg.cc/qtRjvcWY/kiosk-sma.png' },  // маленький
+    { minLevel: 5, src: 'https://i.postimg.cc/DWZBwQRM/kiosk-med.png' },  // средний
+    { minLevel: 10, src: 'https://i.postimg.cc/VJ4KwZZ2/kiosk-big.png' }  // большой
+];
+
+function updateKioskImage() {
+    let current = kioskLevels[0].src;
+
+    // выбираем картинку в зависимости от уровня
+    for (let i = 0; i < kioskLevels.length; i++) {
+        if (game.tapLevel >= kioskLevels[i].minLevel) {
+            current = kioskLevels[i].src;
+        }
+    }
+
+    const kioskImg = document.getElementById('kiosk-base');
+    if (kioskImg && kioskImg.src !== current) {
+        kioskImg.src = current;
+
+        // плавный эффект смены
+        kioskImg.style.transition = 'opacity 0.4s';
+        kioskImg.style.opacity = '0.5';
+        setTimeout(() => kioskImg.style.opacity = '1', 50);
+    }
+}
+
+     
 /* ───────── ELEMENTS ───────── */
 const el = {
     tap: document.getElementById('tap-object'),
@@ -215,6 +242,7 @@ function update() {
     el.helperLevel.textContent = game.helperLevel;
     el.tapCost.textContent = game.tapCost;
     el.helperCost.textContent = game.helperCost;
+    updateKioskImage();
     localStorage.setItem('shaurma_save', JSON.stringify(game));
 }
 
